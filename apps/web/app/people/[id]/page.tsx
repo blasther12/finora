@@ -1,4 +1,9 @@
-import { ResourcePage } from "@/components/resource-page";
-export default function Page() {
-  return <ResourcePage title="Extrato da pessoa" path="/people" />;
+import { PersonStatement } from "@/components/person-statement";
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return <PersonStatement id={id} />;
 }

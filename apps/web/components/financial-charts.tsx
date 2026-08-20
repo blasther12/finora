@@ -28,11 +28,14 @@ type Budget = {
   spent: string;
 };
 
-function nextMonths(quantity: number) {
-  const current = new Date();
+function nextMonths(startPeriod: string, quantity: number) {
+  const [startYear, startMonth] = startPeriod.split("-").map(Number);
   return Array.from({ length: quantity }, (_, index) => {
-    const date = new Date(current.getFullYear(), current.getMonth() + index, 1);
-    return { year: date.getFullYear(), month: date.getMonth() + 1 };
+    const absoluteMonth = startYear * 12 + startMonth - 1 + index;
+    return {
+      year: Math.floor(absoluteMonth / 12),
+      month: (absoluteMonth % 12) + 1,
+    };
   });
 }
 
@@ -43,10 +46,27 @@ const compactMoney = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 1,
 });
 
-export function ProjectionChart({ months = 6 }: { months?: number }) {
-  const periods = nextMonths(months);
+export function ProjectionChart({
+  months = 6,
+  startPeriod,
+}: {
+  months?: number;
+  startPeriod?: string;
+}) {
+  const { data: currentPeriod } = useQuery({
+    queryKey: ["reference-period"],
+    queryFn: () => api<{ value: string }>("/reference-period"),
+    enabled: !startPeriod,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
+  });
+  const effectiveStartPeriod = startPeriod ?? currentPeriod?.value;
+  const periods = effectiveStartPeriod
+    ? nextMonths(effectiveStartPeriod, months)
+    : [];
   const { data, isLoading, error } = useQuery({
-    queryKey: ["projection-chart", periods[0]?.year, periods[0]?.month, months],
+    queryKey: ["projection-chart", effectiveStartPeriod, months],
+    enabled: periods.length > 0,
     queryFn: () =>
       Promise.all(
         periods.map(({ year, month }) =>
@@ -56,9 +76,10 @@ export function ProjectionChart({ months = 6 }: { months?: number }) {
   });
 
   const chartData = data?.map((projection) => ({
-    month: new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(
-      new Date(`${projection.period}-02T12:00:00`),
-    ),
+    month: new Intl.DateTimeFormat("pt-BR", {
+      month: "short",
+      year: "2-digit",
+    }).format(new Date(`${projection.period}-02T12:00:00`)),
     receitas: Number(projection.income.total),
     despesas: Number(projection.expenses.total),
     saldo: Number(projection.projectedBalance),

@@ -39,6 +39,9 @@ export class AnalyticsService {
         spentByCategory.find((item) => item.categoryId === budget.categoryId)
           ?._sum.amount ?? new Prisma.Decimal(0);
       return {
+        period: `${year}-${String(month).padStart(2, "0")}`,
+        year,
+        month,
         category: budget.category.name,
         categoryId: budget.categoryId,
         limit: budget.limitAmount,
@@ -124,6 +127,7 @@ export class AnalyticsService {
         new Prisma.Decimal(0),
       );
     return {
+      referencePeriod: `${year}-${String(month).padStart(2, "0")}`,
       operationalBalance,
       reserveBalance,
       budgets,

@@ -33,4 +33,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test:e2e
+      - run: pnpm format:check
+      - run: pnpm audit:prod
       - run: pnpm build

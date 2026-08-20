@@ -33,6 +33,19 @@ export class Money {
     return new Money(this.cents + other.cents);
   }
 
+  subtract(other: Money): Money {
+    const result = this.cents - other.cents;
+    if (result <= 0n)
+      throw new DomainError("Money subtraction must remain greater than zero");
+    return new Money(result);
+  }
+
+  multiply(multiplier: number): Money {
+    if (!Number.isSafeInteger(multiplier) || multiplier <= 0)
+      throw new DomainError("Money multiplier must be a positive integer");
+    return new Money(this.cents * BigInt(multiplier));
+  }
+
   equals(other: Money): boolean {
     return this.cents === other.cents;
   }
