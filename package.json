@@ -1,0 +1,27 @@
+{
+  "name": "finora",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:e2e": "pnpm --filter @finora/api test:e2e",
+    "format": "prettier --write .",
+    "db:generate": "pnpm --filter @finora/api db:generate",
+    "db:migrate": "pnpm --filter @finora/api db:migrate",
+    "db:migrate:dev": "pnpm --filter @finora/api db:migrate:dev",
+    "db:seed": "pnpm --filter @finora/api db:seed",
+    "db:studio": "pnpm --filter @finora/api db:studio",
+    "db:reset": "pnpm --filter @finora/api db:reset",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2"
+  }
+}

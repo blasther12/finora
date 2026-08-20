@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finora-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-finora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finora}
+      POSTGRES_DB: ${POSTGRES_DB:-finora}
+    ports: ["5432:5432"]
+    volumes: [finora_pg:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    container_name: finora-api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-finora}:${POSTGRES_PASSWORD:-finora}@postgres:5432/${POSTGRES_DB:-finora}
+      PORT: 3001
+    ports: ["3001:3001"]
+    depends_on: { postgres: { condition: service_healthy } }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args: { NEXT_PUBLIC_API_URL: "http://localhost:3001/api/v1" }
+    container_name: finora-web
+    environment: { INTERNAL_API_URL: "http://api:3001/api/v1" }
+    ports: ["3000:3000"]
+    depends_on: { api: { condition: service_healthy } }
+  mongo:
+    image: mongo:7
+    container_name: finora-mongo
+    profiles: [mongo]
+    ports: ["27017:27017"]
+    volumes: [finora_mongo:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  finora_pg:
+  finora_mongo:

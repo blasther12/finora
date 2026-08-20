@@ -1,0 +1,20 @@
+{
+  "name": "@finora/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./base.mjs",
+    "./nest": "./nest.mjs",
+    "./next": "./next.mjs"
+  },
+  "dependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "eslint-config-next": "^15.5.2",
+    "typescript-eslint": "^8.42.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": ">=5.0.0"
+  }
+}

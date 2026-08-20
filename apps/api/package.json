@@ -1,0 +1,55 @@
+{
+  "name": "@finora/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "lint": "eslint src --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:e2e": "jest --config test/jest-e2e.json",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@finora/shared": "workspace:*",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/swagger": "^11.2.0",
+    "@prisma/client": "^6.15.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "date-fns": "^4.1.0",
+    "helmet": "^8.1.0",
+    "nestjs-pino": "^4.4.0",
+    "pino-http": "^10.5.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@finora/eslint-config": "workspace:*",
+    "@nestjs/cli": "^11.0.10",
+    "@nestjs/testing": "^11.1.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.18.1",
+    "@types/supertest": "^6.0.3",
+    "eslint": "^9.35.0",
+    "jest": "^30.1.3",
+    "prisma": "^6.15.0",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0"
+  }
+}
