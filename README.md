@@ -91,7 +91,7 @@ pnpm build
 
 Todo push resultante de merge na `main` executa a pipeline de validação. Quando ela termina com sucesso, o workflow de release cria automaticamente uma nova versão patch e uma GitHub Release com notas geradas a partir dos commits.
 
-O seed idempotente usa somente identidades e instituições demonstrativas e só executa em desenvolvimento ou com `ALLOW_DEMO_SEED=true`. A autenticação fica preparada pelo `userId`; o MVP usa um usuário local fixo. Web e API são publicados apenas em `127.0.0.1`; PostgreSQL permanece acessível somente pela rede interna do Compose.
+O seed idempotente usa somente identidades e instituições demonstrativas e só executa em desenvolvimento ou com `ALLOW_DEMO_SEED=true`. A autenticação fica preparada pelo `userId`; o MVP usa um usuário local fixo. Web e API são publicados apenas em `127.0.0.1`; para ferramentas locais como pgAdmin, PostgreSQL é publicado em `127.0.0.1:5433` para não conflitar com uma instalação local na porta `5432`.
 
 ## 🔐 Segurança
 
