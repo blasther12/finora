@@ -58,17 +58,17 @@ pnpm install
 cp .env.example .env
 pnpm db:generate
 pnpm db:migrate
-pnpm db:seed
+NODE_ENV=development pnpm db:seed
 pnpm dev
 ```
 
-Comandos principais: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm build`, `pnpm format`, `pnpm db:studio`, `pnpm docker:down`.
+Comandos principais: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm format:check`, `pnpm audit:prod`, `pnpm build`, `pnpm format`, `pnpm db:studio`, `pnpm docker:down`.
 
 ## 🏗️ Arquitetura
 
 O workspace pnpm contém Next.js em `apps/web`, NestJS/Prisma em `apps/api` e contratos reutilizáveis em `packages/shared`. A API é um monólito modular organizado por serviços de domínio. PostgreSQL é a única fonte de verdade financeira; Mongo é reservado a uma futura camada documental/IA.
 
-As operações de transferência e pagamento de fatura usam transações de banco. Dinheiro usa `Decimal(19,2)`. Saldos são derivados do saldo inicial e do ledger; gastos de orçamento são derivados de transações. Projeções mantêm confirmado e projetado separados. Consulte [arquitetura](docs/architecture.md), [domínio](docs/domain.md), [banco](docs/database.md) e [API](docs/api.md).
+As operações de transferência e pagamento de fatura usam transações de banco. Dinheiro usa `Decimal(19,2)`. Saldos operacionais são derivados do saldo inicial e do ledger; reservas usam `CashReserve` como fonte canônica. Gastos de orçamento são derivados de transações. Projeções mantêm confirmado e projetado separados. O período corrente é calculado automaticamente pela API no fuso `FINORA_TIME_ZONE`. Consulte [arquitetura](docs/architecture.md), [domínio](docs/domain.md), [banco](docs/database.md) e [API](docs/api.md).
 
 ## 📁 Estrutura
 
@@ -91,7 +91,7 @@ pnpm build
 
 Todo push resultante de merge na `main` executa a pipeline de validação. Quando ela termina com sucesso, o workflow de release cria automaticamente uma nova versão patch e uma GitHub Release com notas geradas a partir dos commits.
 
-O seed idempotente usa somente identidades e instituições demonstrativas. A autenticação fica preparada pelo `userId`; o MVP usa um usuário local fixo.
+O seed idempotente usa somente identidades e instituições demonstrativas e só executa em desenvolvimento ou com `ALLOW_DEMO_SEED=true`. A autenticação fica preparada pelo `userId`; o MVP usa um usuário local fixo. Web e API são publicados apenas em `127.0.0.1`; PostgreSQL permanece acessível somente pela rede interna do Compose.
 
 ## 🔐 Segurança
 

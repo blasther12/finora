@@ -8,6 +8,14 @@ import {
 import { DEFAULT_USER_ID as USER_ID } from "../src/modules/shared/application/current-user";
 const db = new PrismaClient();
 async function main() {
+  if (
+    process.env.NODE_ENV !== "development" &&
+    process.env.ALLOW_DEMO_SEED !== "true"
+  ) {
+    throw new Error(
+      "Demo seed is disabled outside development. Set ALLOW_DEMO_SEED=true to run it intentionally.",
+    );
+  }
   await db.user.upsert({
     where: { id: USER_ID },
     update: {},
@@ -158,4 +166,9 @@ async function main() {
     },
   });
 }
-main().finally(() => db.$disconnect());
+main()
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => db.$disconnect());

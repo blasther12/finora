@@ -1,8 +1,10 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { BudgetChart, ProjectionChart } from "@/components/financial-charts";
 import { api, brl } from "@/lib/api";
 type Dash = {
+  referencePeriod: string;
   operationalBalance: string;
   reserveBalance: string;
   budgets: {
@@ -25,13 +27,11 @@ type Dash = {
   }[];
 };
 export default function Dashboard() {
-  const now = new Date();
   const { data, error } = useQuery({
-    queryKey: ["dashboard"],
-    queryFn: () =>
-      api<Dash>(
-        `/dashboard?year=${now.getFullYear()}&month=${now.getMonth() + 1}`,
-      ),
+    queryKey: ["dashboard", "current-reference-period"],
+    queryFn: () => api<Dash>("/dashboard"),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
   });
   return (
     <>
@@ -40,7 +40,9 @@ export default function Dashboard() {
           <div className="label">Visão financeira</div>
           <h1>Dashboard</h1>
         </div>
-        <button className="btn">+ Nova transação</button>
+        <Link className="btn" href="/transactions">
+          Ver transações
+        </Link>
       </header>
       {error && (
         <div className="card">
@@ -63,7 +65,9 @@ export default function Dashboard() {
       </div>
       <div className="cols">
         <section className="card">
-          <h2 className="section-title">Orçamento do mês</h2>
+          <h2 className="section-title">
+            Orçamento · {data?.referencePeriod ?? "mês atual"}
+          </h2>
           {data?.budgets.length ? (
             data.budgets.map((b) => (
               <div className="row" key={b.category}>
@@ -96,7 +100,9 @@ export default function Dashboard() {
                 <div>
                   <b>{b.creditCard.name}</b>
                   <div className="label">
-                    {new Date(b.dueDate).toLocaleDateString("pt-BR")}
+                    {new Date(b.dueDate).toLocaleDateString("pt-BR", {
+                      timeZone: "UTC",
+                    })}
                   </div>
                 </div>
                 <div>
@@ -119,7 +125,7 @@ export default function Dashboard() {
             </div>
             <span className="badge projected">Inclui projeções</span>
           </div>
-          <ProjectionChart />
+          <ProjectionChart startPeriod={data?.referencePeriod} />
         </section>
         <section className="card">
           <div className="label">Mês atual</div>

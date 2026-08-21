@@ -6,7 +6,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-finora}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finora}
       POSTGRES_DB: ${POSTGRES_DB:-finora}
-    ports: ["5432:5432"]
     volumes: [finora_pg:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -19,7 +18,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-finora}:${POSTGRES_PASSWORD:-finora}@postgres:5432/${POSTGRES_DB:-finora}
       PORT: 3001
-    ports: ["3001:3001"]
+      FINORA_WEB_ORIGIN: ${FINORA_WEB_ORIGIN:-http://localhost:3000}
+      FINORA_TIME_ZONE: ${FINORA_TIME_ZONE:-America/Sao_Paulo}
+    ports: ["127.0.0.1:3001:3001"]
     depends_on: { postgres: { condition: service_healthy } }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
@@ -30,16 +31,18 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-      args: { NEXT_PUBLIC_API_URL: "http://localhost:3001/api/v1" }
+      args:
+        NEXT_PUBLIC_API_URL: "/api/v1"
+        INTERNAL_API_URL: "http://api:3001/api/v1"
     container_name: finora-web
     environment: { INTERNAL_API_URL: "http://api:3001/api/v1" }
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
     depends_on: { api: { condition: service_healthy } }
   mongo:
     image: mongo:7
     container_name: finora-mongo
     profiles: [mongo]
-    ports: ["27017:27017"]
+    ports: ["127.0.0.1:27017:27017"]
     volumes: [finora_mongo:/data/db]
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]

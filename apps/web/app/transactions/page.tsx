@@ -1,4 +1,11 @@
 import { ResourcePage } from "@/components/resource-page";
 export default function Page() {
-  return <ResourcePage title="Transações" path="/transactions" />;
+  return (
+    <ResourcePage
+      title="Transações"
+      path="/transactions"
+      resource="transactions"
+      paginated
+    />
+  );
 }

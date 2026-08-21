@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
+
 enum AccountType {
   CHECKING_ACCOUNT
   SAVINGS
@@ -14,41 +16,49 @@ enum AccountType {
   INVESTMENT
   OTHER
 }
+
 enum TransactionType {
   EXPENSE
   INCOME
   TRANSFER
 }
+
 enum TransactionStatus {
   PROJECTED
   CONFIRMED
   PAID
   CANCELLED
 }
+
 enum BillStatus {
   OPEN
   CLOSED
   PAID
   OVERDUE
 }
+
 enum CategoryType {
   EXPENSE
   INCOME
 }
+
 enum Frequency {
   WEEKLY
   MONTHLY
   YEARLY
 }
+
 enum PersonDirection {
   RECEIVABLE
   PAYABLE
 }
+
 enum EntryStatus {
   PENDING
   SETTLED
   CANCELLED
 }
+
 enum GoalType {
   EMERGENCY_RESERVE
   PURCHASE
@@ -57,6 +67,7 @@ enum GoalType {
   DEBT_PAYMENT
   CUSTOM
 }
+
 enum GoalStatus {
   ACTIVE
   COMPLETED
@@ -64,249 +75,287 @@ enum GoalStatus {
 }
 
 model User {
-  id String @id @default(uuid()) @db.Uuid
-  name String
-  email String @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  accounts Account[]
-  cards CreditCard[]
-  categories Category[]
+  id           String                 @id @default(uuid()) @db.Uuid
+  name         String
+  email        String                 @unique
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  accounts     Account[]
+  cards        CreditCard[]
+  categories   Category[]
   transactions Transaction[]
-  recurring RecurringTransaction[]
-  plans InstallmentPlan[]
-  people Person[]
-  budgets MonthlyBudget[]
-  goals FinancialGoal[]
-  audits AuditLog[]
+  recurring    RecurringTransaction[]
+  plans        InstallmentPlan[]
+  people       Person[]
+  budgets      MonthlyBudget[]
+  goals        FinancialGoal[]
+  audits       AuditLog[]
 }
+
 model Account {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  name String
-  institution String?
-  type AccountType
-  initialBalance Decimal @db.Decimal(19,2)
-  active Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  transactions Transaction[]
-  reserves CashReserve[]
-  recurring RecurringTransaction[]
-  plans InstallmentPlan[]
+  id             String                 @id @default(uuid()) @db.Uuid
+  userId         String                 @db.Uuid
+  name           String
+  institution    String?
+  type           AccountType
+  initialBalance Decimal                @db.Decimal(19, 2)
+  active         Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  user           User                   @relation(fields: [userId], references: [id])
+  transactions   Transaction[]
+  reserves       CashReserve[]
+  recurring      RecurringTransaction[]
+  plans          InstallmentPlan[]
+
   @@index([userId, active])
 }
+
 model CashReserve {
-  id String @id @default(uuid()) @db.Uuid
-  accountId String @db.Uuid
-  name String
-  purpose String?
-  targetAmount Decimal? @db.Decimal(19,2)
-  currentAmount Decimal @default(0) @db.Decimal(19,2)
-  active Boolean @default(true)
-  account Account @relation(fields:[accountId], references:[id])
+  id            String   @id @default(uuid()) @db.Uuid
+  accountId     String   @db.Uuid
+  name          String
+  purpose       String?
+  targetAmount  Decimal? @db.Decimal(19, 2)
+  currentAmount Decimal  @default(0) @db.Decimal(19, 2)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+  account       Account  @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, name])
 }
+
 model CreditCard {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  name String
-  institution String
-  closingDay Int
-  dueDay Int
-  creditLimit Decimal @db.Decimal(19,2)
-  active Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  bills CardBill[]
+  id           String                 @id @default(uuid()) @db.Uuid
+  userId       String                 @db.Uuid
+  name         String
+  institution  String
+  closingDay   Int
+  dueDay       Int
+  creditLimit  Decimal                @db.Decimal(19, 2)
+  active       Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  user         User                   @relation(fields: [userId], references: [id])
+  bills        CardBill[]
   transactions Transaction[]
-  recurring RecurringTransaction[]
-  plans InstallmentPlan[]
+  recurring    RecurringTransaction[]
+  plans        InstallmentPlan[]
+
+  @@unique([userId, name])
   @@index([userId, active])
 }
+
 model CardBill {
-  id String @id @default(uuid()) @db.Uuid
-  creditCardId String @db.Uuid
-  referenceMonth Int
-  referenceYear Int
-  closingDate DateTime @db.Date
-  dueDate DateTime @db.Date
-  currentAmount Decimal @default(0) @db.Decimal(19,2)
-  projectedAmount Decimal @default(0) @db.Decimal(19,2)
-  status BillStatus @default(OPEN)
-  paidAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  creditCard CreditCard @relation(fields:[creditCardId], references:[id])
-  transactions Transaction[]
+  id              String        @id @default(uuid()) @db.Uuid
+  creditCardId    String        @db.Uuid
+  referenceMonth  Int
+  referenceYear   Int
+  closingDate     DateTime      @db.Date
+  dueDate         DateTime      @db.Date
+  currentAmount   Decimal       @default(0) @db.Decimal(19, 2)
+  projectedAmount Decimal       @default(0) @db.Decimal(19, 2)
+  status          BillStatus    @default(OPEN)
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  creditCard      CreditCard    @relation(fields: [creditCardId], references: [id])
+  transactions    Transaction[]
+
   @@unique([creditCardId, referenceYear, referenceMonth])
   @@index([dueDate, status])
 }
+
 model Category {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  name String
-  type CategoryType
-  icon String?
-  active Boolean @default(true)
-  user User @relation(fields:[userId], references:[id])
+  id           String                 @id @default(uuid()) @db.Uuid
+  userId       String                 @db.Uuid
+  name         String
+  type         CategoryType
+  icon         String?
+  active       Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @default(now()) @updatedAt
+  user         User                   @relation(fields: [userId], references: [id])
   transactions Transaction[]
-  recurring RecurringTransaction[]
-  plans InstallmentPlan[]
-  budgets MonthlyBudget[]
+  recurring    RecurringTransaction[]
+  plans        InstallmentPlan[]
+  budgets      MonthlyBudget[]
+
   @@unique([userId, name, type])
 }
+
 model Transaction {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  description String
-  amount Decimal @db.Decimal(19,2)
-  transactionDate DateTime @db.Date
-  type TransactionType
-  status TransactionStatus
-  categoryId String? @db.Uuid
-  accountId String? @db.Uuid
-  creditCardId String? @db.Uuid
-  cardBillId String? @db.Uuid
-  recurringTransactionId String? @db.Uuid
-  installmentId String? @unique @db.Uuid
-  personId String? @db.Uuid
-  transferGroupId String? @db.Uuid
-  transferDirection Int?
-  excludesFromBudget Boolean @default(false)
-  notes String?
-  metadata Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-  user User @relation(fields:[userId], references:[id])
-  category Category? @relation(fields:[categoryId], references:[id])
-  account Account? @relation(fields:[accountId], references:[id])
-  creditCard CreditCard? @relation(fields:[creditCardId], references:[id])
-  cardBill CardBill? @relation(fields:[cardBillId], references:[id])
-  recurringTransaction RecurringTransaction? @relation(fields:[recurringTransactionId], references:[id])
-  installment Installment? @relation(fields:[installmentId], references:[id])
-  person Person? @relation(fields:[personId], references:[id])
-  personEntries PersonEntry[]
+  id                     String                @id @default(uuid()) @db.Uuid
+  userId                 String                @db.Uuid
+  description            String
+  amount                 Decimal               @db.Decimal(19, 2)
+  transactionDate        DateTime              @db.Date
+  type                   TransactionType
+  status                 TransactionStatus
+  categoryId             String?               @db.Uuid
+  accountId              String?               @db.Uuid
+  creditCardId           String?               @db.Uuid
+  cardBillId             String?               @db.Uuid
+  recurringTransactionId String?               @db.Uuid
+  installmentId          String?               @unique @db.Uuid
+  personId               String?               @db.Uuid
+  transferGroupId        String?               @db.Uuid
+  transferDirection      Int?
+  excludesFromBudget     Boolean               @default(false)
+  notes                  String?
+  metadata               Json?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  deletedAt              DateTime?
+  user                   User                  @relation(fields: [userId], references: [id])
+  category               Category?             @relation(fields: [categoryId], references: [id])
+  account                Account?              @relation(fields: [accountId], references: [id])
+  creditCard             CreditCard?           @relation(fields: [creditCardId], references: [id])
+  cardBill               CardBill?             @relation(fields: [cardBillId], references: [id])
+  recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
+  installment            Installment?          @relation(fields: [installmentId], references: [id])
+  person                 Person?               @relation(fields: [personId], references: [id])
+  personEntries          PersonEntry[]
+
+  @@unique([recurringTransactionId, transactionDate])
   @@index([userId, transactionDate, type, status])
   @@index([categoryId, transactionDate])
-  @@unique([recurringTransactionId, transactionDate])
 }
+
 model RecurringTransaction {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  description String
-  amount Decimal @db.Decimal(19,2)
-  frequency Frequency
-  dayOfMonth Int
-  categoryId String @db.Uuid
-  accountId String? @db.Uuid
-  creditCardId String? @db.Uuid
-  startDate DateTime @db.Date
-  endDate DateTime? @db.Date
-  active Boolean @default(true)
-  autoGenerate Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  category Category @relation(fields:[categoryId], references:[id])
-  account Account? @relation(fields:[accountId], references:[id])
-  creditCard CreditCard? @relation(fields:[creditCardId], references:[id])
+  id           String          @id @default(uuid()) @db.Uuid
+  userId       String          @db.Uuid
+  description  String
+  amount       Decimal         @db.Decimal(19, 2)
+  type         TransactionType @default(EXPENSE)
+  frequency    Frequency
+  dayOfMonth   Int
+  categoryId   String          @db.Uuid
+  accountId    String?         @db.Uuid
+  creditCardId String?         @db.Uuid
+  startDate    DateTime        @db.Date
+  endDate      DateTime?       @db.Date
+  active       Boolean         @default(true)
+  autoGenerate Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  user         User            @relation(fields: [userId], references: [id])
+  category     Category        @relation(fields: [categoryId], references: [id])
+  account      Account?        @relation(fields: [accountId], references: [id])
+  creditCard   CreditCard?     @relation(fields: [creditCardId], references: [id])
   transactions Transaction[]
 }
+
 model InstallmentPlan {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  description String
-  totalAmount Decimal? @db.Decimal(19,2)
-  installmentAmount Decimal @db.Decimal(19,2)
+  id                String        @id @default(uuid()) @db.Uuid
+  userId            String        @db.Uuid
+  description       String
+  totalAmount       Decimal?      @db.Decimal(19, 2)
+  installmentAmount Decimal       @db.Decimal(19, 2)
   totalInstallments Int
-  startDate DateTime @db.Date
-  categoryId String @db.Uuid
-  creditCardId String? @db.Uuid
-  accountId String? @db.Uuid
-  personId String? @db.Uuid
-  active Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  category Category @relation(fields:[categoryId], references:[id])
-  creditCard CreditCard? @relation(fields:[creditCardId], references:[id])
-  account Account? @relation(fields:[accountId], references:[id])
-  person Person? @relation(fields:[personId], references:[id])
-  installments Installment[]
+  startDate         DateTime      @db.Date
+  categoryId        String        @db.Uuid
+  creditCardId      String?       @db.Uuid
+  accountId         String?       @db.Uuid
+  personId          String?       @db.Uuid
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  user              User          @relation(fields: [userId], references: [id])
+  category          Category      @relation(fields: [categoryId], references: [id])
+  creditCard        CreditCard?   @relation(fields: [creditCardId], references: [id])
+  account           Account?      @relation(fields: [accountId], references: [id])
+  person            Person?       @relation(fields: [personId], references: [id])
+  installments      Installment[]
 }
+
 model Installment {
-  id String @id @default(uuid()) @db.Uuid
-  installmentPlanId String @db.Uuid
-  number Int
-  amount Decimal @db.Decimal(19,2)
-  dueDate DateTime @db.Date
-  status TransactionStatus @default(PROJECTED)
-  plan InstallmentPlan @relation(fields:[installmentPlanId], references:[id])
-  transaction Transaction?
+  id                String            @id @default(uuid()) @db.Uuid
+  installmentPlanId String            @db.Uuid
+  number            Int
+  amount            Decimal           @db.Decimal(19, 2)
+  dueDate           DateTime          @db.Date
+  status            TransactionStatus @default(PROJECTED)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
+  plan              InstallmentPlan   @relation(fields: [installmentPlanId], references: [id])
+  transaction       Transaction?
+
   @@unique([installmentPlanId, number])
 }
+
 model Person {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  name String
-  notes String?
-  active Boolean @default(true)
-  user User @relation(fields:[userId], references:[id])
-  entries PersonEntry[]
+  id           String            @id @default(uuid()) @db.Uuid
+  userId       String            @db.Uuid
+  name         String
+  notes        String?
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @default(now()) @updatedAt
+  user         User              @relation(fields: [userId], references: [id])
+  entries      PersonEntry[]
   transactions Transaction[]
-  plans InstallmentPlan[]
+  plans        InstallmentPlan[]
+
+  @@unique([userId, name])
 }
+
 model PersonEntry {
-  id String @id @default(uuid()) @db.Uuid
-  personId String @db.Uuid
-  description String
-  amount Decimal @db.Decimal(19,2)
-  direction PersonDirection
-  dueDate DateTime? @db.Date
-  status EntryStatus @default(PENDING)
-  linkedTransactionId String? @db.Uuid
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  person Person @relation(fields:[personId], references:[id])
-  linkedTransaction Transaction? @relation(fields:[linkedTransactionId], references:[id])
+  id                  String          @id @default(uuid()) @db.Uuid
+  personId            String          @db.Uuid
+  description         String
+  amount              Decimal         @db.Decimal(19, 2)
+  direction           PersonDirection
+  dueDate             DateTime?       @db.Date
+  status              EntryStatus     @default(PENDING)
+  linkedTransactionId String?         @db.Uuid
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  person              Person          @relation(fields: [personId], references: [id])
+  linkedTransaction   Transaction?    @relation(fields: [linkedTransactionId], references: [id])
 }
+
 model MonthlyBudget {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  year Int
-  month Int
-  categoryId String @db.Uuid
-  limitAmount Decimal @db.Decimal(19,2)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields:[userId], references:[id])
-  category Category @relation(fields:[categoryId], references:[id])
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  year        Int
+  month       Int
+  categoryId  String   @db.Uuid
+  limitAmount Decimal  @db.Decimal(19, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id])
+
   @@unique([userId, year, month, categoryId])
 }
+
 model FinancialGoal {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  name String
-  description String?
-  targetAmount Decimal @db.Decimal(19,2)
-  currentAmount Decimal @default(0) @db.Decimal(19,2)
-  targetDate DateTime? @db.Date
-  type GoalType
-  status GoalStatus @default(ACTIVE)
-  user User @relation(fields:[userId], references:[id])
+  id            String     @id @default(uuid()) @db.Uuid
+  userId        String     @db.Uuid
+  name          String
+  description   String?
+  targetAmount  Decimal    @db.Decimal(19, 2)
+  currentAmount Decimal    @default(0) @db.Decimal(19, 2)
+  targetDate    DateTime?  @db.Date
+  type          GoalType
+  status        GoalStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
+  user          User       @relation(fields: [userId], references: [id])
 }
+
 model AuditLog {
-  id String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
-  entity String
-  entityId String
-  action String
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  entity       String
+  entityId     String
+  action       String
   previousData Json?
-  newData Json?
-  createdAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id])
+  newData      Json?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+
   @@index([entity, entityId, createdAt])
 }

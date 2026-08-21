@@ -3,19 +3,35 @@ import {
   Controller,
   Get,
   Inject,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
   Query,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import type { GoalStatus, GoalType } from "@prisma/client";
-import { Prisma, TransactionStatus, TransactionType } from "@prisma/client";
+import { Prisma, TransactionStatus } from "@prisma/client";
 import { AnalyticsService } from "../../../analytics/application/services/analytics.service";
 import { FinanceService } from "../../../finance/application/services/finance.service";
 import { DEFAULT_USER_ID as USER_ID } from "../../../shared/application/current-user";
 import { PrismaService } from "../../../shared/infrastructure/database/prisma.service";
+import { currentReferencePeriod } from "../../../shared/domain/date/reference-period";
 import { respond as wrap } from "../../../shared/presentation/http/api-response";
+import {
+  CreateAccountDto,
+  CreateBudgetDto,
+  CreateCreditCardDto,
+  CreateGoalDto,
+  CreateInstallmentPlanDto,
+  CreatePersonDto,
+  CreateTransactionDto,
+  CreateTransferDto,
+  PayBillDto,
+  ReferencePeriodQueryDto,
+  SimulateProjectionDto,
+  SimulationChangeType,
+  TransactionQueryDto,
+} from "./finora.dto";
 
 @ApiTags("Finora")
 @Controller()
@@ -29,26 +45,26 @@ export class FinoraController {
     await this.database.$queryRaw`SELECT 1`;
     return { data: { api: "ok", postgres: "ok" } };
   }
-  @Get("api/v1/dashboard") dashboard(
-    @Query("year") y?: string,
-    @Query("month") m?: string,
-  ) {
-    const d = new Date();
+  @Get("api/v1/dashboard") dashboard(@Query() query: ReferencePeriodQueryDto) {
+    const current = currentReferencePeriod();
     return wrap(
       this.analytics.dashboard(
-        Number(y) || d.getFullYear(),
-        Number(m) || d.getMonth() + 1,
+        query.year ?? current.year,
+        query.month ?? current.month,
       ),
     );
   }
+  @Get("api/v1/reference-period") referencePeriod() {
+    return wrap(currentReferencePeriod());
+  }
   @Get("api/v1/financial-context") async context() {
-    const d = new Date();
-    return wrap(this.analytics.dashboard(d.getFullYear(), d.getMonth() + 1));
+    const current = currentReferencePeriod();
+    return wrap(this.analytics.dashboard(current.year, current.month));
   }
   @Get("api/v1/accounts") accounts() {
     return wrap(this.finance.balances());
   }
-  @Post("api/v1/accounts") account(@Body() b: any) {
+  @Post("api/v1/accounts") account(@Body() b: CreateAccountDto) {
     return wrap(
       this.database.account.create({
         data: {
@@ -69,44 +85,90 @@ export class FinoraController {
       }),
     );
   }
-  @Get("api/v1/credit-cards") cards() {
-    return wrap(
-      this.database.creditCard.findMany({
-        where: { userId: USER_ID, active: true },
-        include: {
-          bills: {
-            orderBy: [{ referenceYear: "desc" }, { referenceMonth: "desc" }],
-            take: 3,
-          },
+  @Get("api/v1/credit-cards") async cards() {
+    const cards = await this.database.creditCard.findMany({
+      where: { userId: USER_ID, active: true },
+      include: {
+        bills: {
+          orderBy: [{ referenceYear: "desc" }, { referenceMonth: "desc" }],
+          take: 3,
         },
-      }),
+      },
+    });
+    return wrap(
+      cards.map((card) => ({
+        ...card,
+        latestBillAmount: card.bills[0]?.currentAmount ?? new Prisma.Decimal(0),
+        latestBillStatus: card.bills[0]?.status ?? "SEM_FATURA",
+      })),
     );
   }
-  @Post("api/v1/credit-cards") card(@Body() b: any) {
+  @Post("api/v1/credit-cards") card(@Body() b: CreateCreditCardDto) {
     return wrap(
       this.database.creditCard.create({
         data: {
           userId: USER_ID,
           name: b.name,
           institution: b.institution,
-          closingDay: Number(b.closingDay),
-          dueDay: Number(b.dueDay),
+          closingDay: b.closingDay,
+          dueDay: b.dueDay,
           creditLimit: new Prisma.Decimal(b.creditLimit),
         },
       }),
     );
   }
+  @Get("api/v1/credit-cards/:id") async cardDetails(@Param("id") id: string) {
+    const card = await this.database.creditCard.findFirst({
+      where: { id, userId: USER_ID, active: true },
+      include: {
+        bills: {
+          orderBy: [{ referenceYear: "desc" }, { referenceMonth: "desc" }],
+        },
+      },
+    });
+    if (!card) throw new NotFoundException("Credit card not found");
+    return wrap(card);
+  }
+  @Get("api/v1/credit-cards/:id/bills/:year/:month") async billDetails(
+    @Param("id") id: string,
+    @Param("year", ParseIntPipe) year: number,
+    @Param("month", ParseIntPipe) month: number,
+  ) {
+    const bill = await this.database.cardBill.findFirst({
+      where: {
+        creditCardId: id,
+        referenceYear: year,
+        referenceMonth: month,
+        creditCard: { userId: USER_ID },
+      },
+      include: {
+        creditCard: true,
+        transactions: {
+          where: { deletedAt: null },
+          include: { category: true, account: true, creditCard: true },
+          orderBy: { transactionDate: "asc" },
+        },
+      },
+    });
+    if (!bill) throw new NotFoundException("Bill not found");
+    return wrap(bill);
+  }
   @Post("api/v1/credit-cards/:cardId/bills/:billId/pay") pay(
     @Param("cardId") c: string,
     @Param("billId") b: string,
-    @Body() dto: any,
+    @Body() dto: PayBillDto,
   ) {
     return wrap(this.finance.payBill(c, b, dto));
   }
-  @Get("api/v1/transactions") async transactions(@Query() q: any) {
-    const page = Math.max(Number(q.page) || 1, 1),
-      limit = Math.min(Number(q.limit) || 20, 100);
-    const where: any = { userId: USER_ID, deletedAt: null };
+  @Get("api/v1/transactions") async transactions(
+    @Query() q: TransactionQueryDto,
+  ) {
+    const page = q.page,
+      limit = q.limit;
+    const where: Prisma.TransactionWhereInput = {
+      userId: USER_ID,
+      deletedAt: null,
+    };
     if (q.type) where.type = q.type;
     if (q.status) where.status = q.status;
     if (q.search)
@@ -128,11 +190,15 @@ export class FinoraController {
     ]);
     return wrap(rows, { page, limit, total });
   }
-  @Post("api/v1/transactions") transaction(@Body() b: any) {
+  @Post("api/v1/transactions") transaction(@Body() b: CreateTransactionDto) {
     return wrap(this.finance.createTransaction(b));
   }
-  @Post("api/v1/transfers") transfer(@Body() b: any) {
+  @Post("api/v1/transfers") transfer(@Body() b: CreateTransferDto) {
     return wrap(this.finance.transfer(b));
+  }
+  @Get("api/v1/budgets/current") async currentBudget() {
+    const { year: currentYear, month: currentMonth } = currentReferencePeriod();
+    return wrap(this.analytics.budgets(currentYear, currentMonth));
   }
   @Get("api/v1/budgets/:year/:month") budgets(
     @Param("year", ParseIntPipe) y: number,
@@ -140,21 +206,30 @@ export class FinoraController {
   ) {
     return wrap(this.analytics.budgets(y, m));
   }
-  @Post("api/v1/budgets") budget(@Body() b: any) {
+  @Post("api/v1/budgets") async budget(@Body() b: CreateBudgetDto) {
+    const category = await this.database.category.findFirst({
+      where: {
+        id: b.categoryId,
+        userId: USER_ID,
+        type: "EXPENSE",
+        active: true,
+      },
+    });
+    if (!category) throw new NotFoundException("Expense category not found");
     return wrap(
       this.database.monthlyBudget.upsert({
         where: {
           userId_year_month_categoryId: {
             userId: USER_ID,
-            year: Number(b.year),
-            month: Number(b.month),
+            year: b.year,
+            month: b.month,
             categoryId: b.categoryId,
           },
         },
         create: {
           userId: USER_ID,
-          year: Number(b.year),
-          month: Number(b.month),
+          year: b.year,
+          month: b.month,
           categoryId: b.categoryId,
           limitAmount: new Prisma.Decimal(b.limitAmount),
         },
@@ -168,20 +243,16 @@ export class FinoraController {
   ) {
     return wrap(this.analytics.projection(y, m));
   }
-  @Post("api/v1/projections/simulate") async simulate(@Body() b: any) {
-    const original = await this.analytics.projection(
-      Number(b.year),
-      Number(b.month),
-    );
+  @Post("api/v1/projections/simulate") async simulate(
+    @Body() b: SimulateProjectionDto,
+  ) {
+    const original = await this.analytics.projection(b.year, b.month);
     const delta = (b.changes ?? []).reduce(
-      (s: number, c: any) =>
-        s +
-        (c.type === "ADD_EXPENSE"
-          ? -Number(c.amount)
-          : c.type === "ADD_INCOME"
-            ? Number(c.amount)
-            : 0),
-      0,
+      (sum, change) =>
+        change.type === SimulationChangeType.ADD_EXPENSE
+          ? sum.minus(change.amount)
+          : sum.plus(change.amount),
+      new Prisma.Decimal(0),
     );
     return wrap({
       original,
@@ -198,7 +269,7 @@ export class FinoraController {
     return wrap(
       this.database.recurringTransaction.findMany({
         where: { userId: USER_ID },
-        include: { category: true },
+        include: { category: true, account: true, creditCard: true },
       }),
     );
   }
@@ -206,106 +277,76 @@ export class FinoraController {
     @Param("year", ParseIntPipe) y: number,
     @Param("month", ParseIntPipe) m: number,
   ) {
-    const items = await this.database.recurringTransaction.findMany({
-      where: {
-        userId: USER_ID,
-        active: true,
-        autoGenerate: true,
-        startDate: { lt: new Date(Date.UTC(y, m, 1)) },
-        OR: [
-          { endDate: null },
-          { endDate: { gte: new Date(Date.UTC(y, m - 1, 1)) } },
-        ],
+    return wrap(this.finance.generateRecurring(y, m));
+  }
+  @Get("api/v1/installments") async installments() {
+    const plans = await this.database.installmentPlan.findMany({
+      where: { userId: USER_ID },
+      include: {
+        installments: { orderBy: { number: "asc" } },
+        category: true,
+        account: true,
+        creditCard: true,
+        person: true,
       },
     });
-    const created = [];
-    for (const r of items) {
-      const day = Math.min(
-        r.dayOfMonth,
-        new Date(Date.UTC(y, m, 0)).getUTCDate(),
-      );
-      const date = new Date(Date.UTC(y, m - 1, day));
-      const row = await this.database.transaction.upsert({
-        where: {
-          recurringTransactionId_transactionDate: {
-            recurringTransactionId: r.id,
-            transactionDate: date,
-          },
-        },
-        create: {
-          userId: USER_ID,
-          description: r.description,
-          amount: r.amount,
-          transactionDate: date,
-          type: TransactionType.EXPENSE,
-          status: TransactionStatus.PROJECTED,
-          categoryId: r.categoryId,
-          accountId: r.accountId,
-          creditCardId: r.creditCardId,
-          recurringTransactionId: r.id,
-        },
-        update: {},
-      });
-      created.push(row);
-    }
-    return wrap(created);
-  }
-  @Get("api/v1/installments") installments() {
     return wrap(
-      this.database.installmentPlan.findMany({
-        where: { userId: USER_ID },
-        include: { installments: true },
-      }),
+      plans.map((plan) => ({
+        ...plan,
+        paidInstallments: plan.installments.filter(
+          (item) =>
+            item.status === TransactionStatus.PAID ||
+            item.status === TransactionStatus.CONFIRMED,
+        ).length,
+        nextDueDate:
+          plan.installments.find(
+            (item) => item.status === TransactionStatus.PROJECTED,
+          )?.dueDate ?? null,
+      })),
     );
   }
-  @Post("api/v1/installments") async installment(@Body() b: any) {
-    const start = new Date(b.startDate);
-    return wrap(
-      this.database.$transaction(async (tx) =>
-        tx.installmentPlan.create({
-          data: {
-            userId: USER_ID,
-            description: b.description,
-            totalAmount: b.totalAmount
-              ? new Prisma.Decimal(b.totalAmount)
-              : undefined,
-            installmentAmount: new Prisma.Decimal(b.installmentAmount),
-            totalInstallments: Number(b.totalInstallments),
-            startDate: start,
-            categoryId: b.categoryId,
-            creditCardId: b.creditCardId,
-            accountId: b.accountId,
-            installments: {
-              create: Array.from(
-                { length: Number(b.totalInstallments) },
-                (_, i) => ({
-                  number: i + 1,
-                  amount: new Prisma.Decimal(b.installmentAmount),
-                  dueDate: new Date(
-                    Date.UTC(
-                      start.getUTCFullYear(),
-                      start.getUTCMonth() + i,
-                      start.getUTCDate(),
-                    ),
-                  ),
-                }),
-              ),
-            },
-          },
-          include: { installments: true },
-        }),
-      ),
-    );
+  @Post("api/v1/installments") installment(
+    @Body() b: CreateInstallmentPlanDto,
+  ) {
+    return wrap(this.finance.createInstallmentPlan(b));
   }
-  @Get("api/v1/people") people() {
+  @Get("api/v1/people") async people() {
+    const people = await this.database.person.findMany({
+      where: { userId: USER_ID, active: true },
+      include: { entries: true },
+    });
     return wrap(
-      this.database.person.findMany({
-        where: { userId: USER_ID, active: true },
-        include: { entries: true },
+      people.map((person) => {
+        const pending = person.entries.filter(
+          (entry) => entry.status === "PENDING",
+        );
+        const receivable = pending
+          .filter((entry) => entry.direction === "RECEIVABLE")
+          .reduce(
+            (sum, entry) => sum.plus(entry.amount),
+            new Prisma.Decimal(0),
+          );
+        const payable = pending
+          .filter((entry) => entry.direction === "PAYABLE")
+          .reduce(
+            (sum, entry) => sum.plus(entry.amount),
+            new Prisma.Decimal(0),
+          );
+        return {
+          ...person,
+          entryCount: pending.length,
+          receivable,
+          payable,
+          netBalance: receivable.minus(payable),
+        };
       }),
     );
   }
   @Get("api/v1/people/:id/statement") async statement(@Param("id") id: string) {
+    const person = await this.database.person.findFirst({
+      where: { id, userId: USER_ID, active: true },
+    });
+    if (!person) throw new NotFoundException("Person not found");
     const e = await this.database.personEntry.findMany({
       where: { personId: id, person: { userId: USER_ID }, status: "PENDING" },
     });
@@ -316,13 +357,14 @@ export class FinoraController {
         .filter((x) => x.direction === "PAYABLE")
         .reduce((s, x) => s.plus(x.amount), new Prisma.Decimal(0));
     return wrap({
+      person,
       receivable,
       payable,
       netBalance: receivable.minus(payable),
       entries: e,
     });
   }
-  @Post("api/v1/people") person(@Body() b: any) {
+  @Post("api/v1/people") person(@Body() b: CreatePersonDto) {
     return wrap(
       this.database.person.create({
         data: { userId: USER_ID, name: b.name, notes: b.notes },
@@ -334,7 +376,7 @@ export class FinoraController {
       this.database.financialGoal.findMany({ where: { userId: USER_ID } }),
     );
   }
-  @Post("api/v1/goals") goal(@Body() b: any) {
+  @Post("api/v1/goals") goal(@Body() b: CreateGoalDto) {
     return wrap(
       this.database.financialGoal.create({
         data: {
@@ -344,8 +386,8 @@ export class FinoraController {
           targetAmount: new Prisma.Decimal(b.targetAmount),
           currentAmount: new Prisma.Decimal(b.currentAmount ?? 0),
           targetDate: b.targetDate ? new Date(b.targetDate) : undefined,
-          type: b.type as GoalType,
-          status: (b.status ?? "ACTIVE") as GoalStatus,
+          type: b.type,
+          status: b.status ?? "ACTIVE",
         },
       }),
     );
